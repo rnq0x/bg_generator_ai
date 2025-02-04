@@ -88,12 +88,14 @@ def req_data_stream(join_dict: dict, requests_manager: RequestsManager):
                         output_data = data.get('output', {}).get('data', [])
                         if output_data:
                             final_url = output_data[0].get('url')
-                            break
+                            return final_url
+                            
                 except json.JSONDecodeError as e:
                     print(f"JSONDecodeError: {e}")
                 except Exception as e:
                     print(f"Error processing line: {e}")
-    return final_url
+    return False
+    
 
 
 def generate_background(queue: queue.Queue, proxy_manager: ProxyManager, requests_manager: RequestsManager):
@@ -107,6 +109,9 @@ def generate_background(queue: queue.Queue, proxy_manager: ProxyManager, request
             return
 
         photo_url = req_data_stream(join_dict, requests_manager)
+        if not photo_url:
+            print('[X] Ошибка, возможно на IP закончилась квота, пропускаю')
+            continue
         
         photo = requests_manager.make_request('GET', photo_url)
 
