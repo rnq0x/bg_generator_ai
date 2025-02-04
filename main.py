@@ -4,6 +4,7 @@ import random
 import time
 import uuid
 import requests
+import os
 
 
 class PromptGenerator():
@@ -137,6 +138,10 @@ def generate_background(prompt: str):
 
 
 def main():
+    folder_path = 'output'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        
     gen = PromptGenerator()
 
     photos_required = int(input('Введите количество фонов для генерации: '))
