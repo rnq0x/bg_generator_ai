@@ -4,6 +4,7 @@ import os
 from queue import Queue
 import sys
 import threading
+import time
 
 from modules.config import ConfigManager
 from modules.methods import generate_background
@@ -45,6 +46,8 @@ def main():
         thread = threading.Thread(target=generate_background, args=(task_queue, proxy_manager, requests_manager,))
         thread.start()
         threads.append(thread)
+        print(f'[V] Поток #{_} запущен')
+        time.sleep(1)
     
     # Останавливаем потоки
     for thread in threads:
