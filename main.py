@@ -1,11 +1,16 @@
 import asyncio
 import json
+from pathlib import Path
 import random
 import time
 import uuid
 import requests
 import os
+import socks
+import socket
+import urllib3
 
+urllib3.disable_warnings()
 
 class PromptGenerator():
     datasets = {
@@ -59,8 +64,134 @@ class PromptGenerator():
         ]
         return ", ".join(components)
 
+# Добавляем класс для работы с прокси
 
-def req_generate_photo(prompt: str):
+
+class ProxyManager:
+    def __init__(self):
+        self.proxy_file = 'proxylist.txt'
+        self.proxy_url = 'https://proxyleet.com/proxy/type=socks5&speed=200&key=e8b228425086fbdfdb5d91d21a1b9693'
+        self.proxies = []
+        self.working_proxies = []
+        self.timeout = 10
+        self.test_url = "https://httpbin.org/ip"
+
+        # Скачиваем актуальный прокси-лист при инициализации
+        self.download_proxy_list()
+        self.load_proxies()
+
+    def download_proxy_list(self):
+        try:
+            response = requests.get(self.proxy_url, timeout=15, verify=False)
+            response.raise_for_status()
+
+            # Сохраняем свежие прокси
+            with open(self.proxy_file, 'w') as f:
+                f.write(response.text)
+
+            print(
+                f"[✓] Прокси-лист успешно обновлен ({len(response.text.splitlines())} записей)")
+
+        except Exception as e:
+            print(f"[!] Ошибка при загрузке прокси-листа: {str(e)}")
+            if not Path(self.proxy_file).exists():
+                raise SystemExit(
+                    "[X] Нет локальной копии прокси-листа. Программа завершена.")
+
+    def load_proxies(self):
+        try:
+            with open(self.proxy_file, 'r') as f:
+                self.proxies = [line.strip() for line in f if line.strip()]
+
+            # Фильтрация невалидных записей
+            self.proxies = [p for p in self.proxies if self.is_valid_proxy(p)]
+
+            if not self.proxies:
+                raise ValueError("Нет валидных прокси в файле")
+
+            print(f"[✓] Загружено {len(self.proxies)} прокси")
+
+        except Exception as e:
+            print(f"[!] Ошибка загрузки прокси: {str(e)}")
+            raise SystemExit("[X] Критическая ошибка. Программа завершена.")
+
+    def is_valid_proxy(self, proxy: str) -> bool:
+        parts = proxy.split(':')
+        if len(parts) not in [2, 4]:
+            return False
+        if not parts[1].isdigit():
+            return False
+        return True
+
+    def check_proxy(self, proxy):
+        try:
+            # Устанавливаем прокси
+            proxy_parts = proxy.split(':')
+            if len(proxy_parts) == 2:
+                host, port = proxy_parts
+                socks.set_default_proxy(socks.SOCKS5, host, int(port))
+                socket.socket = socks.socksocket
+            else:
+                raise ValueError(
+                    "Некорректный формат прокси. Ожидается host:port")
+
+            # Проверяем соединение через прокси
+            response = requests.get(self.test_url, timeout=self.timeout, verify=False)
+            if response.status_code == 200:
+                return True
+        except Exception as e:
+            print(f"[!] Ошибка при проверке прокси {proxy}: {str(e)}")
+            return False
+        finally:
+            socks.set_default_proxy()
+            socket.socket = socket.socket
+        return False
+
+    def get_random_proxy(self):
+        if not self.working_proxies:
+            print("[~] Проверяем рабочие прокси...")
+            for proxy in self.proxies:
+                if self.check_proxy(proxy):
+                    self.working_proxies.append(proxy)
+            if not self.working_proxies:
+                print("[!] Не найдено рабочих прокси")
+                return None
+        return random.choice(self.working_proxies)
+
+
+# Модифицируем функции запросов
+def make_request(method, url, proxy_manager, **kwargs):
+    max_retries = 3
+    for _ in range(max_retries):
+        proxy = proxy_manager.get_random_proxy()
+        if not proxy:
+            return None
+
+        proxy_url = f"socks5://{proxy}"
+        proxies = {
+            'http': proxy_url,
+            'https': proxy_url
+        }
+
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                proxies=proxies,
+                timeout=60,
+                verify=False,
+                **kwargs
+            )
+            if response.status_code == 200:
+                return response
+        except Exception as e:
+            print(f"[!] Ошибка при использовании прокси {proxy}: {str(e)}")
+            if proxy in proxy_manager.working_proxies:
+                proxy_manager.working_proxies.remove(proxy)
+    return None
+
+
+def req_generate_photo(prompt: str, proxy_manager):
     url = "https://image-generation.perchance.org/api/generate"
 
     querystring = {"prompt": prompt, "seed": -1, "resolution": "512x768", "guidanceScale": "7", "negativePrompt": "bad lighting, low-quality, deformed, text, poorly drawn, holding camera, bad art, bad angle, boring, low-resolution, worst quality, bad composition, disfigured",
@@ -86,15 +217,15 @@ def req_generate_photo(prompt: str):
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
     }
 
+    response = make_request("POST", url, proxy_manager,
+                            headers=headers, params=querystring)
+    return response.json() if response else None
 
-    response = requests.request(
-        "POST", url, data=payload, headers=headers, params=querystring)
-    return response.json()
 
-def req_get_photo(imageId: str):
+def req_get_photo(imageId: str, proxy_manager):
     url = "https://image-generation.perchance.org/api/downloadTemporaryImage"
 
-    querystring = {"imageId":imageId}
+    querystring = {"imageId": imageId}
 
     payload = ""
     headers = {
@@ -114,40 +245,44 @@ def req_get_photo(imageId: str):
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
     }
 
-    response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+    response = requests.request(
+        "GET", url, data=payload, headers=headers, params=querystring)
     if response.status_code == 404:
         return None
-    return response
+    response = make_request("GET", url, proxy_manager,
+                            params={"imageId": imageId})
+    return response if response else None
 
-def generate_background(prompt: str):
+
+def generate_background(prompt: str, proxy_manager):
     print(f'[V] Запускаю генерацию фото для промпта - {prompt}')
-    gen_object = req_generate_photo(prompt)
-    try:
-        imageId = gen_object['imageId']
-    except:
+    gen_object = req_generate_photo(prompt, proxy_manager)
+
+    if not gen_object or 'imageId' not in gen_object:
         print('[X] Не удалось получить фото')
-        return 0
-        
-    photo = req_get_photo(imageId)
-    
-    with open(f'output/{uuid.uuid4()}.jpeg', 'wb') as f:
-        f.write(photo.content)
-    
-    print(f'[V] {uuid.uuid4()}.jpeg сохранено')
-    
+        return
+
+    photo = req_get_photo(gen_object['imageId'], proxy_manager)
+
+    if photo and photo.status_code == 200:
+        filename = f'output/{uuid.uuid4()}.jpeg'
+        with open(filename, 'wb') as f:
+            f.write(photo.content)
+        print(f'[V] {filename} сохранено')
 
 
 def main():
     folder_path = 'output'
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
-        
+
+    proxy_manager = ProxyManager()
     gen = PromptGenerator()
 
     photos_required = int(input('Введите количество фонов для генерации: '))
     for i in range(photos_required):
         prompt = gen.generate_prompt()
-        generate_background(prompt)
+        generate_background(prompt, proxy_manager)
 
     print('Успешно')
 

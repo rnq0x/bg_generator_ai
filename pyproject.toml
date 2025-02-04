@@ -11,6 +11,7 @@ python = "^3.11"
 aiohttp = "^3.11.11"
 aiohttp-socks = "^0.10.1"
 aiograpi = "^0.0.3"
+requests = {extras = ["socks"], version = "^2.32.3"}
 
 
 [build-system]
