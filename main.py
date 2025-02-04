@@ -22,7 +22,7 @@ def main():
     proxy = config_manager.get_proxy()
     
     if proxy == 'None':
-        print('[X] Не обнаружены прокси в конфигурационном файле')
+        input('[X] Не обнаружены прокси в конфигурационном файле')
         sys.exit()
     
     proxy_manager = ProxyManager(config_manager)
@@ -46,11 +46,10 @@ def main():
         thread.start()
         threads.append(thread)
     
-    print('Останавливаю потоки')
     # Останавливаем потоки
     for thread in threads:
         thread.join()
-    print('Успешно')
+    input('[V] Генерация завершена, нажмите любую клавишу для выхода')
 
 if __name__ == '__main__':
     main()

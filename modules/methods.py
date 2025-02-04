@@ -115,4 +115,3 @@ def generate_background(queue: queue.Queue, proxy_manager: ProxyManager, request
             with open(filename, 'wb') as f:
                 f.write(photo.content)
             print(f'[V] {filename} сохранено')
-    print(1)
