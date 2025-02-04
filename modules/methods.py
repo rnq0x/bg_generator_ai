@@ -75,26 +75,28 @@ def req_data_stream(join_dict: dict, requests_manager: RequestsManager):
         "sec-fetch-site": "cross-site",
         "user-agent": requests_manager.fake_ua.random
     }
-
-    response = requests_manager.make_request("GET", url, data=payload, headers=headers, params=querystring, stream=True)
-    for line in response.iter_lines():
-        if line:
-            decoded_line = line.decode('utf-8').strip()
-            if decoded_line.startswith('data:'):
-                try:
-                    data = json.loads(decoded_line[5:])
-                    msg = data.get('msg')
-                    if msg == 'process_completed':
-                        output_data = data.get('output', {}).get('data', [])
-                        if output_data:
-                            final_url = output_data[0].get('url')
-                            return final_url
-                            
-                except json.JSONDecodeError as e:
-                    print(f"JSONDecodeError: {e}")
-                except Exception as e:
-                    print(f"Error processing line: {e}")
-    return False
+    try:
+        response = requests_manager.make_request("GET", url, data=payload, headers=headers, params=querystring, stream=True)
+        for line in response.iter_lines():
+            if line:
+                decoded_line = line.decode('utf-8').strip()
+                if decoded_line.startswith('data:'):
+                    try:
+                        data = json.loads(decoded_line[5:])
+                        msg = data.get('msg')
+                        if msg == 'process_completed':
+                            output_data = data.get('output', {}).get('data', [])
+                            if output_data:
+                                final_url = output_data[0].get('url')
+                                return final_url
+                                
+                    except json.JSONDecodeError as e:
+                        print(f"JSONDecodeError: {e}")
+                    except Exception as e:
+                        print(f"Error processing line: {e}")
+        return False
+    except:
+        return False
     
 
 
