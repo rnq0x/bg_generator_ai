@@ -1,2 +1,4 @@
 output/*
+outdated/*
 proxylist.txt
+config.ini

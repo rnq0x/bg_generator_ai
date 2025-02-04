@@ -12,6 +12,8 @@ aiohttp = "^3.11.11"
 aiohttp-socks = "^0.10.1"
 aiograpi = "^0.0.3"
 requests = {extras = ["socks"], version = "^2.32.3"}
+configparser = "^7.1.0"
+fake-useragent = "^2.0.3"
 
 
 [build-system]

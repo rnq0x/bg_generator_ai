@@ -1,2 +1,5 @@
+configparser==7.1.0 ; python_version >= "3.11" and python_version < "4.0"
+pysocks==1.7.1 ; python_version >= "3.11" and python_version < "4.0"
 requests==2.32.3 ; python_version >= "3.11" and python_version < "4.0"
 requests[socks]==2.32.3 ; python_version >= "3.11" and python_version < "4.0"
+fake-useragent==2.0.3 ; python_version >= "3.11" and python_version < "4.0"
